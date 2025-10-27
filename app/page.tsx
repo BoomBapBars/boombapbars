@@ -17,7 +17,7 @@ export default function BoomBapBarsHome() {
       try {
         const query = `
           {
-            products(first: 6) {
+            products(first: 24, sortKey: CREATED_AT, reverse: true) {
               nodes {
                 id
                 title
