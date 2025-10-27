@@ -181,26 +181,18 @@ export default function BoomBapBarsHome() {
                   <Button
                     size="sm"
                     className="rounded-xl"
-                    onClick={() =>
-                      p.variantId
-                        ? shopify(
-                            `
-                            mutation($lines:[CartLineInput!]) {
-                              cartCreate(input:{ lines:$lines }) {
-                                cart { checkoutUrl }
-                                userErrors { message }
-                              }
-                            }
-                          `,
-                            { lines: [{ merchandiseId: p.variantId, quantity: 1 }] }
-                          ).then((res: any) => {
-                            const url =
-                              res?.data?.cartCreate?.cart?.checkoutUrl;
-                            if (url) window.location.href = url;
-                            else alert("Could not create checkout.");
-                          })
-                        : alert("No variant for this item (fallback only).")
-                    }
+                 onClick={async () => {
+  if (!p.variantId) return alert("No variant found.");
+  const res = await fetch("/api/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ variantId: p.variantId, quantity: 1 }),
+  });
+  const data = await res.json();
+  if (data.error) return alert(data.error);
+  window.location.href = data.checkoutUrl;
+}}
+
                   >
                     Add to cart
                   </Button>
