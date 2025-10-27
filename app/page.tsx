@@ -1,14 +1,54 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, ShoppingBag, Instagram, Music2, Sparkles, BadgePercent, Mail, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { hasShopify, shopify } from "@/lib/shopify";
+
+
 
 export default function BoomBapBarsHome() {
   const [email, setEmail] = useState("");
+const [items, setItems] = useState<any[]>([]);
+
+useEffect(() => {
+  (async () => {
+    try {
+      // simple probe: ask Shopify for a few products
+      const query = `
+        { products(first: 6) {
+            nodes {
+              id
+              title
+              featuredImage { url }
+              variants(first:1){ nodes { id price { amount currencyCode } } }
+              tags
+            }
+        }}`
+      const res: any = await shopify(query);
+      const fromShopify = res?.data?.products?.nodes?.map((p: any) => {
+        const v = p.variants?.nodes?.[0];
+        return {
+          title: p.title,
+          price: v?.price ? new Intl.NumberFormat(undefined, {
+            style: "currency",
+            currency: v.price.currencyCode
+          }).format(parseFloat(v.price.amount)) : "",
+          img: p.featuredImage?.url ?? "/house.jpg",
+          tag: p.tags?.[0] ?? "Featured",
+          variantId: v?.id,
+        };
+      }) ?? [];
+      setItems(fromShopify);
+    } catch (e) {
+      console.error("Shopify fetch failed", e);
+      setItems([]); // keep empty; we’ll fall back to your static list below
+    }
+  })();
+}, []);
 
   const features = [
     {
@@ -32,25 +72,28 @@ export default function BoomBapBarsHome() {
     {
       title: "Boom Bap Nutrition Facts Tee",
       price: "$32",
-      img: "https://images.unsplash.com/photo-1520975682031-d287ae535c46?q=80&w=1200&auto=format&fit=crop",
-      tag: "Alt Facts Edition"
+      img: "https://i.etsystatic.com/61509595/r/il/8efe93/7317631034/il_600x600.7317631034_ggo0.jpg",
+      tag: "Facts go BOOM"
     },
     {
       title: "Turntablist Label Tee",
-      price: "$34",
-      img: "https://images.unsplash.com/photo-1490092374320-1ca36d69ff17?q=80&w=1200&auto=format&fit=crop",
+      price: "$32",
+      img: "https://i.etsystatic.com/61509595/r/il/be620f/7317678326/il_600x600.7317678326_poeq.jpg",
       tag: "Scratch Science"
     },
     {
       title: "House Music Facts Tee",
       price: "$32",
-      img: "https://images.unsplash.com/photo-1520975980146-c3d2a9c59478?q=80&w=1200&auto=format&fit=crop",
+      img: "/house.jpg",
       tag: "Deep Cut"
     }
   ];
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
+      <div className="fixed top-2 right-2 text-xs text-neutral-400">Mode: {hasShopify ? 'Shopify' : 'Mock'}</div>
+<div className="fixed top-6 right-2 text-xs text-neutral-400">Items: {items.length}</div>
+
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 -z-10">
           <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/40 to-black/90" />
@@ -121,7 +164,8 @@ export default function BoomBapBarsHome() {
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {products.map((p, i) => (
+            {(items.length ? items : products).map((p, i) => (
+
               <Card key={i} className="group bg-neutral-900/60 border-neutral-800 overflow-hidden">
                 <div className="aspect-[4/3] overflow-hidden">
                   <img src={p.img} alt={p.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
@@ -132,7 +176,30 @@ export default function BoomBapBarsHome() {
                 </CardHeader>
                 <CardContent className="flex items-center justify-between">
                   <span className="text-neutral-200">{p.price}</span>
-                  <Button size="sm" className="rounded-xl">Add to cart</Button>
+                  <Button
+  size="sm"
+  className="rounded-xl"
+  onClick={() =>
+    p.variantId
+      ? shopify(`
+          mutation($lines:[CartLineInput!]) {
+            cartCreate(input:{ lines:$lines }) {
+              cart { checkoutUrl }
+              userErrors { message }
+            }
+          }
+        `, { lines: [{ merchandiseId: p.variantId, quantity: 1 }] }
+      ).then((res:any) => {
+        const url = res?.data?.cartCreate?.cart?.checkoutUrl;
+        if (url) window.location.href = url;
+        else alert("Could not create checkout.");
+      })
+      : alert("No variant for this item (fallback only).")
+  }
+>
+  Add to cart
+</Button>
+
                 </CardContent>
               </Card>
             ))}
