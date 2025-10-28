@@ -11,6 +11,10 @@ import { hasShopify, shopify } from "@/lib/shopify";
 export default function BoomBapBarsHome() {
   const [email, setEmail] = useState("");
   const [items, setItems] = useState<any[]>([]);
+  const [category, setCategory] = useState("All");
+  const categories = ["All", ...Array.from(new Set(items.map((p) => p.tag)))];
+
+
 
   useEffect(() => {
     (async () => {
@@ -155,9 +159,24 @@ export default function BoomBapBarsHome() {
               View all <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
+<div className="flex flex-wrap gap-2 mb-6">
+  {categories.map((cat) => (
+    <Button
+      key={cat}
+      variant={cat === category ? "default" : "secondary"}
+      className="rounded-xl"
+      onClick={() => setCategory(cat)}
+    >
+      {cat}
+    </Button>
+  ))}
+</div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {items.map((p, i) => (
+            {items
+  .filter((p) => category === "All" || p.tag === category)
+  .map((p, i) => (
+
               <Card
                 key={i}
                 className="group bg-neutral-900/60 border-neutral-800 overflow-hidden"
