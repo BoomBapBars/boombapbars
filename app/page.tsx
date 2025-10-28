@@ -1,309 +1,341 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import {
-  ArrowRight,
-  ShoppingBag,
-  Instagram,
-  Music2,
-  Sparkles,
-  BadgePercent,
-  Play,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { hasShopify, shopify } from "@/lib/shopify";
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 
-export default function BoomBapBarsHome() {
-  const [items, setItems] = useState<any[]>([]);
-  const [category, setCategory] = useState("All");
-  const categories = ["All", ...Array.from(new Set(items.map((p) => p.tag)))];
+// ---------- Types ----------
+type ShopifyImage = {
+  url: string;
+  altText?: string | null;
+  width?: number | null;
+  height?: number | null;
+};
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const query = `
-          {
-            products(first: 24, sortKey: CREATED_AT, reverse: true) {
-              nodes {
-                id
-                title
-                featuredImage { url altText }
-                variants(first:1){ nodes { id price { amount currencyCode } } }
-                tags
-              }
-            }
-          }`;
+type ShopifyVariant = {
+  id: string;
+  title?: string;
+  price?: string | number;
+  availableForSale?: boolean;
+};
 
-        const res: any = await shopify(query);
-        const fromShopify =
-          res?.data?.products?.nodes?.map((p: any) => {
-            const v = p.variants?.nodes?.[0];
-            return {
-              title: p.title,
-              price: v?.price
-                ? new Intl.NumberFormat(undefined, {
-                    style: "currency",
-                    currency: v.price.currencyCode,
-                  }).format(parseFloat(v.price.amount))
-                : "",
-              img: p.featuredImage?.url ?? "/house.jpg",
-              tag: p.tags?.[0] ?? "Featured",
-              variantId: v?.id,
-            };
-          }) ?? [];
-        setItems(fromShopify);
-      } catch (e) {
-        console.error("Shopify fetch failed", e);
-        setItems([]);
-      }
-    })();
-  }, []);
+type ShopifyProduct = {
+  id: string;
+  title: string;
+  handle: string;
+  tags?: string[];
+  images?: ShopifyImage[];
+  variants?: ShopifyVariant[];
+};
 
-  const features = [
-    {
-      icon: <Sparkles className="w-6 h-6" />,
-      title: "Golden Age Vibes",
-      body: "90s–2000s hip-hop energy — raw drums, gritty textures, and bold type.",
-    },
-    {
-      icon: <BadgePercent className="w-6 h-6" />,
-      title: "Weekly Drops",
-      body: "New Drop Fridays. Limited runs. Collect them like 12\" singles.",
-    },
-    {
-      icon: <Music2 className="w-6 h-6" />,
-      title: "DJ Approved",
-      body: "Designs that nod to turntablism, battles, and crate-digging culture.",
-    },
-  ];
+// ---------- Helpers ----------
+async function createCheckout(variantId: string, quantity = 1) {
+  const res = await fetch('/api/checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lines: [{ merchandiseId: variantId, quantity }] }),
+  });
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(msg || 'Checkout failed');
+  }
+  const data = await res.json();
+  return data?.checkoutUrl as string;
+}
 
+function currencyFormat(value?: string | number, currency = 'USD') {
+  if (value == null) return '';
+  const n = typeof value === 'string' ? parseFloat(value) : value;
+  if (Number.isNaN(n)) return '';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(n);
+}
+
+// ---------- Motion Variants (typed) ----------
+const pageVariants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { when: 'beforeChildren', staggerChildren: 0.08 } },
+} satisfies Variants;
+
+const heroVariants = {
+  hidden: { opacity: 0, y: 14, filter: 'blur(6px)' },
+  show: {
+    opacity: 1,
+    y: 0,
+    filter: 'blur(0px)',
+    transition: { type: 'spring', stiffness: 220, damping: 24 },
+  },
+} satisfies Variants;
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06, delayChildren: 0.05 },
+  },
+} satisfies Variants;
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 14, scale: 0.98 },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { type: 'spring', stiffness: 220, damping: 26 },
+  },
+} satisfies Variants;
+
+// ---------- Skeleton ----------
+function CardSkeleton() {
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100">
-      <div className="fixed top-2 right-2 text-xs text-neutral-400">
-        Mode: {hasShopify ? "Shopify" : "Mock"}
+    <div className="group relative overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/60">
+      <div className="relative aspect-[4/3] w-full overflow-hidden">
+        <div className="absolute inset-0 bg-neutral-800/80 animate-shimmer" />
       </div>
-      <div className="fixed top-6 right-2 text-xs text-neutral-400">
-        Items: {items.length}
+      <div className="p-4">
+        <div className="h-5 w-2/3 rounded bg-neutral-800 animate-shimmer" />
+        <div className="mt-2 h-4 w-1/3 rounded bg-neutral-800 animate-shimmer" />
       </div>
-
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/40 to-black/90" />
-          <img
-            className="w-full h-full object-cover opacity-40"
-            src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1920&auto=format&fit=crop"
-            alt="Urban backdrop"
-          />
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7 }}
-            className="flex flex-col items-center text-center gap-6"
-          >
-            <div className="inline-flex items-center gap-2 border rounded-full px-3 py-1 text-xs sm:text-sm bg-black/40 border-white/15">
-              <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              New Drop Friday • Live now
-            </div>
-
-            <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight leading-[1.05]">
-              BoomBapBars
-            </h1>
-            <p className="max-w-2xl text-neutral-300 text-base sm:text-lg">
-              Golden Age lyrics reimagined. Streetwear for DJs, crate-diggers,
-              and anyone who still loves a filthy snare.
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <Button size="lg" className="rounded-2xl">
-                <ShoppingBag className="mr-2 h-4 w-4" /> Shop the Drop
-              </Button>
-              <Button
-                size="lg"
-                variant="secondary"
-                className="rounded-2xl border border-white/20 bg-white/10"
-              >
-                <Play className="mr-2 h-4 w-4" /> Watch Lookbook
-              </Button>
-            </div>
-
-            <div className="text-xs sm:text-sm text-neutral-400 flex items-center gap-2">
-              <span className="uppercase tracking-widest">
-                The Real Alternative Facts
-              </span>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      <section className="py-14 sm:py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid sm:grid-cols-3 gap-6">
-            {features.map((f, i) => (
-              <Card key={i} className="bg-neutral-900/60 border-neutral-800">
-                <CardHeader className="flex flex-row items-center gap-3">
-                  <div className="p-2 rounded-xl bg-neutral-800">{f.icon}</div>
-                  <CardTitle className="text-lg">{f.title}</CardTitle>
-                </CardHeader>
-                <CardContent className="text-neutral-300 text-sm">
-                  {f.body}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="py-6 sm:py-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-end justify-between mb-6">
-            <h2 className="text-2xl sm:text-3xl font-bold">Featured</h2>
-            <Button variant="ghost" className="text-neutral-300">
-              View all <ArrowRight className="ml-1 h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Category buttons */}
-          <div className="flex flex-wrap gap-2 mb-6">
-            {categories.map((cat) => {
-              const active = cat === category;
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setCategory(cat)}
-                  className={`rounded-xl px-4 py-2 text-sm transition relative ${
-                    active
-                      ? "bg-white text-black font-semibold shadow-md"
-                      : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
-                  }`}
-                >
-                  {cat}
-                  {active && (
-                    <span
-                      className="absolute -bottom-1 left-1/2 h-0.5 bg-white rounded-full transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
-                      style={{ width: "80%", transform: "translateX(-50%)" }}
-                    ></span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="h-px w-full bg-neutral-800 mb-6"></div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {items
-              .filter((p) => category === "All" || p.tag === category)
-              .map((p, i) => (
-                <Card
-                  key={i}
-                  className="group bg-neutral-900/60 border-neutral-800 overflow-hidden transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl relative"
-                >
-                  <div className="relative aspect-[4/3] overflow-hidden">
-
-                    {/* subtle gradient shine */}
-                    <div className="absolute inset-0 pointer-events-none opacity-20 group-hover:opacity-0 transition-opacity duration-300 bg-gradient-to-tr from-white/20 via-transparent to-transparent"></div>
-
-                    {/* slow vinyl reflection sweep */}
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-30 animate-[sweep_2s_linear_infinite]"></div>
-
-                    <img
-                      src={p.img ?? "/house.jpg"}
-                      alt={p.title}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                      onError={(e) => (e.currentTarget.src = "/house.jpg")}
-                    />
-
-                    {/* hover quick-action icons */}
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 gap-3">
-                      <button
-                        className="bg-black/60 backdrop-blur text-white px-3 py-2 rounded-md text-xs hover:bg-black"
-                        onClick={async () => {
-                          if (!p.variantId) return alert("No variant found.");
-                          const res = await fetch("/api/checkout", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              variantId: p.variantId,
-                              quantity: 1,
-                            }),
-                          });
-                          const data = await res.json();
-                          if (data.error) return alert(data.error);
-                          window.location.href = data.checkoutUrl;
-                        }}
-                      >
-                        Quick Buy
-                      </button>
-
-                      <button
-                        className="bg-black/60 backdrop-blur text-white px-3 py-2 rounded-md text-xs hover:bg-black"
-                        onClick={() => alert("Wishlist coming soon")}
-                      >
-                        ♥
-                      </button>
-                    </div>
-                  </div>
-
-                  <CardHeader>
-                    <div className="text-xs text-neutral-400 uppercase tracking-widest">
-                      {p.tag}
-                    </div>
-                    <CardTitle className="text-lg">{p.title}</CardTitle>
-                  </CardHeader>
-
-                  <CardContent className="flex items-center justify-between">
-                    <span className="text-neutral-200">{p.price}</span>
-                    <Button
-                      size="sm"
-                      className="rounded-xl"
-                      onClick={async () => {
-                        if (!p.variantId) return alert("No variant found.");
-                        const res = await fetch("/api/checkout", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            variantId: p.variantId,
-                            quantity: 1,
-                          }),
-                        });
-                        const data = await res.json();
-                        if (data.error) return alert(data.error);
-                        window.location.href = data.checkoutUrl;
-                      }}
-                    >
-                      Add to cart
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-          </div>
-        </div>
-      </section>
-
-      <footer className="border-t border-neutral-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="text-sm text-neutral-400">
-            © {new Date().getFullYear()} BoomBapBars
-          </div>
-          <div className="flex items-center gap-4 text-sm">
-            <a href="https://boombapbars.com" className="hover:underline">
-              boombapbars.com
-            </a>
-            <a
-              href="#"
-              className="inline-flex items-center gap-1 hover:underline"
-            >
-              <Instagram className="w-4 h-4" /> @BoomBapBars
-            </a>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
 
-/* Keyframes for reflection sweep */
+// ---------- Product Card ----------
+function ProductCard({ product }: { product: ShopifyProduct }) {
+  const img = product.images?.[0];
+  const variant = product.variants?.[0];
+  const price = variant?.price;
+  const available = variant?.availableForSale ?? true;
+
+  const [busy, setBusy] = useState(false);
+
+  const onBuyNow = async () => {
+    if (!variant?.id) return;
+    try {
+      setBusy(true);
+      const url = await createCheckout(variant.id, 1);
+      if (url) window.location.href = url;
+    } catch (e) {
+      console.error(e);
+      alert('Could not start checkout. Try again in a moment.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <motion.div
+      variants={cardVariants}
+      className="group relative overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/60 transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl"
+    >
+      <div className="relative aspect-[4/3] overflow-hidden">
+        {img?.url ? (
+          <Image
+            src={img.url}
+            alt={img.altText || product.title}
+            fill
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            priority={false}
+          />
+        ) : (
+          <div className="absolute inset-0 grid place-items-center bg-neutral-800 text-neutral-400">
+            No image
+          </div>
+        )}
+
+        {/* Subtle reflection */}
+        <div className="pointer-events-none card-reflection" />
+
+        {/* Sweep shine on hover */}
+        <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+          <div className="shine-sweep" />
+        </div>
+
+        {/* Quick actions */}
+        <div className="absolute inset-x-3 bottom-3 flex gap-2 translate-y-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+          <Link
+            href={`/products/${product.handle}`}
+            className="flex-1 rounded-xl bg-white/10 px-3 py-2 text-center text-sm font-medium text-white backdrop-blur hover:bg-white/15"
+          >
+            View
+          </Link>
+          <button
+            onClick={onBuyNow}
+            disabled={!available || busy}
+            className="flex-1 rounded-xl bg-emerald-500 px-3 py-2 text-center text-sm font-semibold text-emerald-900 hover:bg-emerald-400 disabled:opacity-50"
+            aria-disabled={!available || busy}
+          >
+            {busy ? 'Loading…' : available ? 'Buy Now' : 'Sold Out'}
+          </button>
+        </div>
+      </div>
+
+      <div className="p-4">
+        <div className="flex items-center justify-between gap-4">
+          <h3 className="text-balance text-base font-semibold text-white">
+            {product.title}
+          </h3>
+          <span className="shrink-0 text-sm text-neutral-300">{currencyFormat(price)}</span>
+        </div>
+        {product.tags && product.tags.length > 0 && (
+          <p className="mt-1 line-clamp-1 text-xs text-neutral-400">
+            {product.tags.slice(0, 3).join(' · ')}
+          </p>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+// ---------- Category Tabs ----------
+function CategoryTabs({
+  categories,
+  active,
+  onChange,
+}: {
+  categories: string[];
+  active: string;
+  onChange: (c: string) => void;
+}) {
+  return (
+    <div className="relative mb-6 flex w-full flex-wrap gap-2">
+      {categories.map((c) => {
+        const activeTab = c === active;
+        return (
+          <button
+            key={c}
+            onClick={() => onChange(c)}
+            className="relative rounded-full px-4 py-2 text-sm font-medium text-neutral-200 hover:text-white"
+            data-active={activeTab ? 'true' : 'false'}
+          >
+            {c}
+            <span className="tab-underline" aria-hidden />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------- Background FX ----------
+function BackgroundFX() {
+  return (
+    <>
+      {/* Soft radial vignette */}
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-10%,rgba(99,102,241,0.12),transparent_60%),radial-gradient(1000px_500px_at_100%_10%,rgba(16,185,129,0.08),transparent_60%)]" />
+      {/* Animated gradient wash */}
+      <div className="pointer-events-none fixed inset-0 -z-10 animate-gradient-rotate bg-conic" />
+      {/* Film grain */}
+      <div className="pointer-events-none fixed inset-0 -z-10 grain opacity-[0.08] mix-blend-overlay" />
+    </>
+  );
+}
+
+// ---------- Page ----------
+export default function Page() {
+  const [products, setProducts] = useState<ShopifyProduct[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [category, setCategory] = useState<string>('All');
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch('/api/products', { cache: 'no-store' });
+        const data = await res.json();
+        if (!alive) return;
+        const items: ShopifyProduct[] = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.products)
+          ? data.products
+          : [];
+        setProducts(items);
+      } catch (e) {
+        console.error(e);
+        setProducts([]);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    set.add('All');
+    (products || []).forEach((p) => (p.tags || []).forEach((t) => set.add(t)));
+    return Array.from(set);
+  }, [products]);
+
+  const filtered = useMemo(() => {
+    if (!products) return [];
+    if (category === 'All') return products;
+    return products.filter((p) => (p.tags || []).includes(category));
+  }, [products, category]);
+
+  return (
+    <>
+      <BackgroundFX />
+      <motion.main
+        variants={pageVariants}
+        initial="hidden"
+        animate="show"
+        className="mx-auto w-full max-w-7xl px-4 pb-20 pt-10"
+      >
+        {/* Hero */}
+        <section className="mb-8">
+          <motion.h1
+            variants={heroVariants}
+            className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl"
+          >
+            BoomBapBars — New Drop Fridays
+          </motion.h1>
+
+          <motion.p
+            variants={heroVariants}
+            className="mt-2 max-w-2xl text-sm text-neutral-300 sm:text-base"
+          >
+            Truth in threads. Animated grids. Checkout that actually checks out.
+          </motion.p>
+
+          {/* Animated underline */}
+          <motion.div
+            variants={heroVariants}
+            className="relative mt-4 h-[3px] w-40 overflow-hidden rounded-full bg-neutral-800"
+          >
+            <span className="hero-underline" />
+          </motion.div>
+        </section>
+
+        {/* Category Tabs */}
+        <CategoryTabs categories={categories} active={category} onChange={setCategory} />
+
+        {/* Grid */}
+        <AnimatePresence initial={false} mode="popLayout">
+          <motion.section
+            key={category}
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            exit={{ opacity: 0 }}
+            className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            {loading &&
+              Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={`s-${i}`} />)}
+
+            {!loading && filtered.length === 0 && (
+              <div className="col-span-full rounded-xl border border-neutral-800 p-10 text-center text-neutral-300">
+                Nothing here yet — try another tag.
+              </div>
+            )}
+
+            {!loading && filtered.map((p) => <ProductCard key={p.id} product={p} />)}
+          </motion.section>
+        </AnimatePresence>
+      </motion.main>
+    </>
+  );
+}
