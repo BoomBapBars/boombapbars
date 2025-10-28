@@ -208,7 +208,7 @@ function CategoryTabs({
   onChange: (c: string) => void;
 }) {
   return (
-    <div className="sticky top-0 z-40 -mx-4 mb-6 border-b border-neutral-900/70 bg-neutral-950/80 backdrop-blur supports-[backdrop-filter]:bg-neutral-950/60">
+    <div className="sticky top-0 z-40 -mx-4 mb-6 border-b border-neutral-900/70 bg-neutral-900/80 backdrop-blur">
       <div className="mx-auto max-w-7xl px-4">
         <div className="flex w-full flex-wrap gap-2 py-3">
           {categories.map((c) => {

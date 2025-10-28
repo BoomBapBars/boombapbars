@@ -11,7 +11,8 @@
     color-scheme: dark;
   }
   html, body {
-    @apply bg-neutral-950 text-neutral-200 antialiased;
+    /* downgraded from bg-neutral-950 to bg-neutral-900 for older Tailwind */
+    @apply bg-neutral-900 text-neutral-200 antialiased;
   }
 }
 
