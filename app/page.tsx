@@ -2,14 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, ShoppingBag, Instagram, Music2, Sparkles, BadgePercent, Play } from "lucide-react";
+import {
+  ArrowRight,
+  ShoppingBag,
+  Instagram,
+  Music2,
+  Sparkles,
+  BadgePercent,
+  Play,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-// import { Input } from "@/components/ui/input"; // not used right now
 import { hasShopify, shopify } from "@/lib/shopify";
 
 export default function BoomBapBarsHome() {
-  const [email, setEmail] = useState("");
   const [items, setItems] = useState<any[]>([]);
   const [category, setCategory] = useState("All");
   const categories = ["All", ...Array.from(new Set(items.map((p) => p.tag)))];
@@ -29,6 +35,7 @@ export default function BoomBapBarsHome() {
               }
             }
           }`;
+
         const res: any = await shopify(query);
         const fromShopify =
           res?.data?.products?.nodes?.map((p: any) => {
@@ -107,7 +114,8 @@ export default function BoomBapBarsHome() {
               BoomBapBars
             </h1>
             <p className="max-w-2xl text-neutral-300 text-base sm:text-lg">
-              Golden Age lyrics reimagined. Streetwear for DJs, crate-diggers, and anyone who still loves a filthy snare.
+              Golden Age lyrics reimagined. Streetwear for DJs, crate-diggers,
+              and anyone who still loves a filthy snare.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
               <Button size="lg" className="rounded-2xl">
@@ -166,17 +174,25 @@ export default function BoomBapBarsHome() {
                 <button
                   key={cat}
                   onClick={() => setCategory(cat)}
-                  className={`rounded-xl px-4 py-2 text-sm transition ${
+                  className={`rounded-xl px-4 py-2 text-sm transition relative ${
                     active
-                      ? "bg-white text-black font-semibold"
+                      ? "bg-white text-black font-semibold shadow-md"
                       : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
                   }`}
                 >
                   {cat}
+                  {active && (
+                    <span
+                      className="absolute -bottom-1 left-1/2 h-0.5 bg-white rounded-full transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+                      style={{ width: "80%", transform: "translateX(-50%)" }}
+                    ></span>
+                  )}
                 </button>
               );
             })}
           </div>
+
+          <div className="h-px w-full bg-neutral-800 mb-6"></div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {items
@@ -184,22 +200,61 @@ export default function BoomBapBarsHome() {
               .map((p, i) => (
                 <Card
                   key={i}
-                  className="group bg-neutral-900/60 border-neutral-800 overflow-hidden"
+                  className="group bg-neutral-900/60 border-neutral-800 overflow-hidden transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl relative"
                 >
-                  <div className="aspect-[4/3] overflow-hidden">
+                  <div className="relative aspect-[4/3] overflow-hidden">
+
+                    {/* subtle gradient shine */}
+                    <div className="absolute inset-0 pointer-events-none opacity-20 group-hover:opacity-0 transition-opacity duration-300 bg-gradient-to-tr from-white/20 via-transparent to-transparent"></div>
+
+                    {/* slow vinyl reflection sweep */}
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-30 animate-[sweep_2s_linear_infinite]"></div>
+
                     <img
                       src={p.img ?? "/house.jpg"}
                       alt={p.title}
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                       onError={(e) => (e.currentTarget.src = "/house.jpg")}
                     />
+
+                    {/* hover quick-action icons */}
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 gap-3">
+                      <button
+                        className="bg-black/60 backdrop-blur text-white px-3 py-2 rounded-md text-xs hover:bg-black"
+                        onClick={async () => {
+                          if (!p.variantId) return alert("No variant found.");
+                          const res = await fetch("/api/checkout", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              variantId: p.variantId,
+                              quantity: 1,
+                            }),
+                          });
+                          const data = await res.json();
+                          if (data.error) return alert(data.error);
+                          window.location.href = data.checkoutUrl;
+                        }}
+                      >
+                        Quick Buy
+                      </button>
+
+                      <button
+                        className="bg-black/60 backdrop-blur text-white px-3 py-2 rounded-md text-xs hover:bg-black"
+                        onClick={() => alert("Wishlist coming soon")}
+                      >
+                        ♥
+                      </button>
+                    </div>
                   </div>
+
                   <CardHeader>
                     <div className="text-xs text-neutral-400 uppercase tracking-widest">
                       {p.tag}
                     </div>
                     <CardTitle className="text-lg">{p.title}</CardTitle>
                   </CardHeader>
+
                   <CardContent className="flex items-center justify-between">
                     <span className="text-neutral-200">{p.price}</span>
                     <Button
@@ -210,7 +265,10 @@ export default function BoomBapBarsHome() {
                         const res = await fetch("/api/checkout", {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ variantId: p.variantId, quantity: 1 }),
+                          body: JSON.stringify({
+                            variantId: p.variantId,
+                            quantity: 1,
+                          }),
                         });
                         const data = await res.json();
                         if (data.error) return alert(data.error);
@@ -247,3 +305,5 @@ export default function BoomBapBarsHome() {
     </div>
   );
 }
+
+/* Keyframes for reflection sweep */
