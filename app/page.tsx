@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 
 // ---------- Types ----------
@@ -188,7 +189,7 @@ function ProductCard({ product }: { product: ShopifyProduct }) {
   );
 }
 
-// ---------- Category Tabs ----------
+// ---------- Sticky Category Tabs (URL-synced) ----------
 function CategoryTabs({
   categories,
   active,
@@ -199,44 +200,100 @@ function CategoryTabs({
   onChange: (c: string) => void;
 }) {
   return (
-    <div className="relative mb-6 flex w-full flex-wrap gap-2">
-      {categories.map((c) => {
-        const activeTab = c === active;
-        return (
-          <button
-            key={c}
-            onClick={() => onChange(c)}
-            className="relative rounded-full px-4 py-2 text-sm font-medium text-neutral-200 hover:text-white"
-            data-active={activeTab ? 'true' : 'false'}
-          >
-            {c}
-            <span className="tab-underline" aria-hidden />
-          </button>
-        );
-      })}
+    <div className="sticky top-0 z-40 -mx-4 mb-6 border-b border-neutral-900/70 bg-neutral-950/65 backdrop-blur supports-[backdrop-filter]:bg-neutral-950/45">
+      <div className="mx-auto max-w-7xl px-4">
+        <div className="flex w-full flex-wrap gap-2 py-3">
+          {categories.map((c) => {
+            const activeTab = c === active;
+            return (
+              <button
+                key={c}
+                onClick={() => onChange(c)}
+                className="relative rounded-full px-4 py-2 text-sm font-medium text-neutral-200 hover:text-white"
+                data-active={activeTab ? 'true' : 'false'}
+              >
+                {c}
+                <span className="tab-underline" aria-hidden />
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
 
-// ---------- Background FX ----------
+// ---------- Micro-Parallax Background ----------
 function BackgroundFX() {
+  // scrollY captured in a ref for rAF-driven transform
+  const [y, setY] = useState(0);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const onScroll = () => {
+      if (rafRef.current) return; // throttle to rAF
+      rafRef.current = requestAnimationFrame(() => {
+        setY(window.scrollY || 0);
+        rafRef.current && cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  // Parallax factors (subtle): lower = slower drift
+  const g = (factor: number) => ({ transform: `translate3d(0, ${-(y * factor)}px, 0)` });
+
   return (
     <>
-      {/* Soft radial vignette */}
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-10%,rgba(99,102,241,0.12),transparent_60%),radial-gradient(1000px_500px_at_100%_10%,rgba(16,185,129,0.08),transparent_60%)]" />
-      {/* Animated gradient wash */}
-      <div className="pointer-events-none fixed inset-0 -z-10 animate-gradient-rotate bg-conic" />
-      {/* Film grain */}
-      <div className="pointer-events-none fixed inset-0 -z-10 grain opacity-[0.08] mix-blend-overlay" />
+      {/* Soft radial vignette (static) */}
+      <div className="pointer-events-none fixed inset-0 -z-30 bg-[radial-gradient(1200px_600px_at_50%_-10%,rgba(99,102,241,0.12),transparent_60%),radial-gradient(1000px_500px_at_100%_10%,rgba(16,185,129,0.08),transparent_60%)]" />
+
+      {/* Conic gradient wash (very slow upward drift) */}
+      <div
+        className="pointer-events-none fixed inset-0 -z-40 bg-conic will-change-transform"
+        style={g(0.04)}
+        aria-hidden
+      />
+
+      {/* Film grain (even slower for texture) */}
+      <div
+        className="pointer-events-none fixed inset-0 -z-50 grain opacity-[0.08] mix-blend-overlay will-change-transform"
+        style={g(0.02)}
+        aria-hidden
+      />
     </>
   );
 }
 
 // ---------- Page ----------
 export default function Page() {
+  const router = useRouter();
+  const search = useSearchParams();
+
   const [products, setProducts] = useState<ShopifyProduct[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [category, setCategory] = useState<string>('All');
+
+  // Read initial category from URL (?tag=)
+  const initialTag = (search.get('tag') || 'All').trim();
+  const [category, setCategory] = useState<string>(initialTag || 'All');
+
+  // Keep URL updated when category changes (no scroll jump)
+  useEffect(() => {
+    const params = new URLSearchParams(Array.from(search.entries()));
+    if (category === 'All') {
+      params.delete('tag');
+    } else {
+      params.set('tag', category);
+    }
+    router.replace(`/?${params.toString()}`, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category]);
 
   useEffect(() => {
     let alive = true;
@@ -286,7 +343,7 @@ export default function Page() {
         className="mx-auto w-full max-w-7xl px-4 pb-20 pt-10"
       >
         {/* Hero */}
-        <section className="mb-8">
+        <section className="mb-6">
           <motion.h1
             variants={heroVariants}
             className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl"
@@ -310,7 +367,7 @@ export default function Page() {
           </motion.div>
         </section>
 
-        {/* Category Tabs */}
+        {/* Sticky Category Tabs */}
         <CategoryTabs categories={categories} active={category} onChange={setCategory} />
 
         {/* Grid */}
