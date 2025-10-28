@@ -60,8 +60,45 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        {/* JSON-LD (Brand + Website) */}
+        <script
+          type="application/ld+json"
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              name: "BoomBapBars",
+              url: "https://boombapbars.com",
+              logo: "https://boombapbars.com/house.jpg",
+              sameAs: [
+                "https://instagram.com/boombapbars"
+              ]
+            }),
+          }}
+        />
+
+        <script
+          type="application/ld+json"
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              name: "BoomBapBars",
+              url: "https://boombapbars.com",
+              potentialAction: {
+                "@type": "SearchAction",
+                target: "https://boombapbars.com/?q={search_term_string}",
+                "query-input": "required name=search_term_string",
+              },
+            }),
+          }}
+        />
+
         {children}
       </body>
     </html>
   );
 }
+
