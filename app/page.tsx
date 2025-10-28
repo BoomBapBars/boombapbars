@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, ShoppingBag, Instagram, Music2, Sparkles, BadgePercent, Mail, Play } from "lucide-react";
+import { ArrowRight, ShoppingBag, Instagram, Music2, Sparkles, BadgePercent, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+// import { Input } from "@/components/ui/input"; // not used right now
 import { hasShopify, shopify } from "@/lib/shopify";
 
 export default function BoomBapBarsHome() {
@@ -13,8 +13,6 @@ export default function BoomBapBarsHome() {
   const [items, setItems] = useState<any[]>([]);
   const [category, setCategory] = useState("All");
   const categories = ["All", ...Array.from(new Set(items.map((p) => p.tag)))];
-
-
 
   useEffect(() => {
     (async () => {
@@ -159,65 +157,71 @@ export default function BoomBapBarsHome() {
               View all <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
-<div className="flex flex-wrap gap-2 mb-6">
-  {categories.map((cat) => (
-    <Button
-      key={cat}
-      variant={cat === category ? "default" : "secondary"}
-      className="rounded-xl"
-      onClick={() => setCategory(cat)}
-    >
-      {cat}
-    </Button>
-  ))}
-</div>
+
+          {/* Category buttons */}
+          <div className="flex flex-wrap gap-2 mb-6">
+            {categories.map((cat) => {
+              const active = cat === category;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setCategory(cat)}
+                  className={`rounded-xl px-4 py-2 text-sm transition ${
+                    active
+                      ? "bg-white text-black font-semibold"
+                      : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
+                  }`}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {items
-  .filter((p) => category === "All" || p.tag === category)
-  .map((p, i) => (
-
-              <Card
-                key={i}
-                className="group bg-neutral-900/60 border-neutral-800 overflow-hidden"
-              >
-                <div className="aspect-[4/3] overflow-hidden">
-                  <img
-                    src={p.img ?? "/house.jpg"}
-                    alt={p.title}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    onError={(e) => (e.currentTarget.src = "/house.jpg")}
-                  />
-                </div>
-                <CardHeader>
-                  <div className="text-xs text-neutral-400 uppercase tracking-widest">
-                    {p.tag}
+              .filter((p) => category === "All" || p.tag === category)
+              .map((p, i) => (
+                <Card
+                  key={i}
+                  className="group bg-neutral-900/60 border-neutral-800 overflow-hidden"
+                >
+                  <div className="aspect-[4/3] overflow-hidden">
+                    <img
+                      src={p.img ?? "/house.jpg"}
+                      alt={p.title}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      onError={(e) => (e.currentTarget.src = "/house.jpg")}
+                    />
                   </div>
-                  <CardTitle className="text-lg">{p.title}</CardTitle>
-                </CardHeader>
-                <CardContent className="flex items-center justify-between">
-                  <span className="text-neutral-200">{p.price}</span>
-                  <Button
-                    size="sm"
-                    className="rounded-xl"
-                 onClick={async () => {
-  if (!p.variantId) return alert("No variant found.");
-  const res = await fetch("/api/checkout", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ variantId: p.variantId, quantity: 1 }),
-  });
-  const data = await res.json();
-  if (data.error) return alert(data.error);
-  window.location.href = data.checkoutUrl;
-}}
-
-                  >
-                    Add to cart
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+                  <CardHeader>
+                    <div className="text-xs text-neutral-400 uppercase tracking-widest">
+                      {p.tag}
+                    </div>
+                    <CardTitle className="text-lg">{p.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex items-center justify-between">
+                    <span className="text-neutral-200">{p.price}</span>
+                    <Button
+                      size="sm"
+                      className="rounded-xl"
+                      onClick={async () => {
+                        if (!p.variantId) return alert("No variant found.");
+                        const res = await fetch("/api/checkout", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ variantId: p.variantId, quantity: 1 }),
+                        });
+                        const data = await res.json();
+                        if (data.error) return alert(data.error);
+                        window.location.href = data.checkoutUrl;
+                      }}
+                    >
+                      Add to cart
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
           </div>
         </div>
       </section>
