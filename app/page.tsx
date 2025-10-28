@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -39,7 +39,7 @@ async function createCheckout(variantId: string, quantity = 1) {
   });
   if (!res.ok) {
     const msg = await res.text();
-    throw new Error(msg || 'Checkout failed');
+    throw new Error(msg || `Checkout failed (${res.status})`);
   }
   const data = await res.json();
   return data?.checkoutUrl as string;
@@ -86,7 +86,7 @@ const cardVariants = {
   },
 } satisfies Variants;
 
-// ---------- Skeleton ----------
+// ---------- UI bits ----------
 function CardSkeleton() {
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/60">
@@ -97,6 +97,14 @@ function CardSkeleton() {
         <div className="h-5 w-2/3 rounded bg-neutral-800 animate-shimmer" />
         <div className="mt-2 h-4 w-1/3 rounded bg-neutral-800 animate-shimmer" />
       </div>
+    </div>
+  );
+}
+
+function ErrorBanner({ message }: { message: string }) {
+  return (
+    <div className="mb-6 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+      {message}
     </div>
   );
 }
@@ -200,7 +208,7 @@ function CategoryTabs({
   onChange: (c: string) => void;
 }) {
   return (
-    <div className="sticky top-0 z-40 -mx-4 mb-6 border-b border-neutral-900/70 bg-neutral-950/65 backdrop-blur supports-[backdrop-filter]:bg-neutral-950/45">
+    <div className="sticky top-0 z-40 -mx-4 mb-6 border-b border-neutral-900/70 bg-neutral-950/80 backdrop-blur supports-[backdrop-filter]:bg-neutral-950/60">
       <div className="mx-auto max-w-7xl px-4">
         <div className="flex w-full flex-wrap gap-2 py-3">
           {categories.map((c) => {
@@ -225,16 +233,15 @@ function CategoryTabs({
 
 // ---------- Micro-Parallax Background ----------
 function BackgroundFX() {
-  // scrollY captured in a ref for rAF-driven transform
   const [y, setY] = useState(0);
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
     const onScroll = () => {
-      if (rafRef.current) return; // throttle to rAF
+      if (rafRef.current) return;
       rafRef.current = requestAnimationFrame(() => {
         setY(window.scrollY || 0);
-        rafRef.current && cancelAnimationFrame(rafRef.current);
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       });
     };
@@ -246,22 +253,21 @@ function BackgroundFX() {
     };
   }, []);
 
-  // Parallax factors (subtle): lower = slower drift
   const g = (factor: number) => ({ transform: `translate3d(0, ${-(y * factor)}px, 0)` });
 
   return (
     <>
-      {/* Soft radial vignette (static) */}
-      <div className="pointer-events-none fixed inset-0 -z-30 bg-[radial-gradient(1200px_600px_at_50%_-10%,rgba(99,102,241,0.12),transparent_60%),radial-gradient(1000px_500px_at_100%_10%,rgba(16,185,129,0.08),transparent_60%)]" />
+      {/* Radial vignette */}
+      <div className="pointer-events-none fixed inset-0 -z-30 bg-[radial-gradient(1200px_600px_at_50%_-10%,rgba(99,102,241,0.10),transparent_60%),radial-gradient(1000px_500px_at_100%_10%,rgba(16,185,129,0.06),transparent_60%)]" />
 
-      {/* Conic gradient wash (very slow upward drift) */}
+      {/* Conic wash */}
       <div
         className="pointer-events-none fixed inset-0 -z-40 bg-conic will-change-transform"
         style={g(0.04)}
         aria-hidden
       />
 
-      {/* Film grain (even slower for texture) */}
+      {/* Grain */}
       <div
         className="pointer-events-none fixed inset-0 -z-50 grain opacity-[0.08] mix-blend-overlay will-change-transform"
         style={g(0.02)}
@@ -278,6 +284,7 @@ export default function Page() {
 
   const [products, setProducts] = useState<ShopifyProduct[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
 
   // Read initial category from URL (?tag=)
   const initialTag = (search.get('tag') || 'All').trim();
@@ -299,17 +306,37 @@ export default function Page() {
     let alive = true;
     (async () => {
       try {
-        const res = await fetch('/api/products', { cache: 'no-store' });
+        setErr(null);
+        setLoading(true);
+        const res = await fetch('/api/products?ts=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          throw new Error(`GET /api/products → ${res.status} ${res.statusText}${text ? ` — ${text}` : ''}`);
+        }
         const data = await res.json();
+
+        // Accept several shapes: [], {products}, {data:{products}}
+        const items: unknown =
+          Array.isArray(data) ? data :
+          Array.isArray((data as any)?.products) ? (data as any).products :
+          Array.isArray((data as any)?.data?.products) ? (data as any).data.products :
+          [];
+
+        const normalized: ShopifyProduct[] = (items as any[]).map((p) => ({
+          id: p.id,
+          title: p.title,
+          handle: p.handle,
+          tags: p.tags ?? [],
+          images: p.images ?? p.image ? [p.image] : [],
+          variants: p.variants ?? [],
+        }));
+
         if (!alive) return;
-        const items: ShopifyProduct[] = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.products)
-          ? data.products
-          : [];
-        setProducts(items);
-      } catch (e) {
+        setProducts(normalized);
+      } catch (e: any) {
         console.error(e);
+        if (!alive) return;
+        setErr(e?.message || 'Failed to load products.');
         setProducts([]);
       } finally {
         if (alive) setLoading(false);
@@ -318,6 +345,7 @@ export default function Page() {
     return () => {
       alive = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const categories = useMemo(() => {
@@ -358,7 +386,7 @@ export default function Page() {
             Truth in threads. Animated grids. Checkout that actually checks out.
           </motion.p>
 
-          {/* Animated underline */}
+        {/* Animated underline */}
           <motion.div
             variants={heroVariants}
             className="relative mt-4 h-[3px] w-40 overflow-hidden rounded-full bg-neutral-800"
@@ -366,6 +394,9 @@ export default function Page() {
             <span className="hero-underline" />
           </motion.div>
         </section>
+
+        {/* Error banner if API failed */}
+        {err && <ErrorBanner message={err} />}
 
         {/* Sticky Category Tabs */}
         <CategoryTabs categories={categories} active={category} onChange={setCategory} />
@@ -383,7 +414,7 @@ export default function Page() {
             {loading &&
               Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={`s-${i}`} />)}
 
-            {!loading && filtered.length === 0 && (
+            {!loading && !err && filtered.length === 0 && (
               <div className="col-span-full rounded-xl border border-neutral-800 p-10 text-center text-neutral-300">
                 Nothing here yet — try another tag.
               </div>
