@@ -1,13 +1,14 @@
 // app/api/product/[handle]/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
+// keep env lookups simple
 function getEnv(name: string) {
   return process.env[name] ?? process.env[`NEXT_PUBLIC_${name}`] ?? null;
 }
 const DOMAIN = getEnv("SHOPIFY_STORE_DOMAIN");
 const TOKEN  = getEnv("SHOPIFY_STOREFRONT_TOKEN");
 
-export const revalidate = 0;          // no cache
+export const revalidate = 0;
 export const dynamic = "force-dynamic";
 
 const QUERY = /* GraphQL */ `
@@ -27,11 +28,8 @@ const QUERY = /* GraphQL */ `
   }
 `;
 
-// NOTE: avoid destructuring in the signature; read from context.params inside.
-export async function GET(
-  _req: NextRequest,
-  context: { params: { handle: string } }
-) {
+// NOTE: avoid fancy generics—use a loose context to stop TS from thinking params is a Promise.
+export async function GET(_req: Request, context: any) {
   try {
     if (!DOMAIN || !TOKEN) {
       return NextResponse.json(
@@ -40,16 +38,12 @@ export async function GET(
       );
     }
 
-    const handle = context?.params?.handle;
+    const handle: string | undefined = context?.params?.handle;
     if (!handle) {
-      return NextResponse.json(
-        { error: "Missing product handle" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing product handle" }, { status: 400 });
     }
 
     const endpoint = `https://${DOMAIN}/api/2024-07/graphql.json`;
-
     const res = await fetch(endpoint, {
       method: "POST",
       headers: {
@@ -62,10 +56,7 @@ export async function GET(
 
     const json = await res.json();
     if (!res.ok || json.errors) {
-      return NextResponse.json(
-        { error: json.errors ?? "Shopify error" },
-        { status: 502 }
-      );
+      return NextResponse.json({ error: json.errors ?? "Shopify error" }, { status: 502 });
     }
 
     const p = json?.data?.product;
@@ -88,9 +79,6 @@ export async function GET(
       },
     });
   } catch (e: any) {
-    return NextResponse.json(
-      { error: e?.message || "Network error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: e?.message || "Network error" }, { status: 500 });
   }
 }
