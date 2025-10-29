@@ -47,7 +47,7 @@ const cardVariants = { hidden: { opacity: 0, y: 14, scale: 0.98 }, show: { opaci
 // ---------- UI bits ----------
 function CardSkeleton() {
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-gray-800 bg-gray-900/60">
+    <div className="group relative w-full max-w-sm overflow-hidden rounded-2xl border border-gray-800 bg-gray-900/60">
       <div className="relative aspect-[4/3] w-full overflow-hidden">
         <div className="absolute inset-0 bg-gray-800/80 animate-shimmer" />
       </div>
@@ -62,7 +62,7 @@ function ErrorBanner({ message }: { message: string }) {
   return <div className="mb-6 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">{message}</div>;
 }
 
-// ---------- Product Card ----------
+// ---------- Product Card (with size guards) ----------
 function ProductCard({ product }: { product: ShopifyProduct }) {
   const img = product.images?.[0];
   const variant = product.variants?.[0];
@@ -78,10 +78,19 @@ function ProductCard({ product }: { product: ShopifyProduct }) {
   };
 
   return (
-    <motion.div variants={cardVariants} className="group relative overflow-hidden rounded-2xl border border-gray-800 bg-gray-900/60 transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl">
-      <div className="relative aspect-[4/3] overflow-hidden">
+    <motion.div
+      variants={cardVariants}
+      className="group relative w-full max-w-sm overflow-hidden rounded-2xl border border-gray-800 bg-gray-900/60 transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl"
+    >
+      <div className="relative aspect-[4/3] max-h-[420px] w-full overflow-hidden">
         {img?.url ? (
-          <Image src={img.url} alt={img.altText || product.title} fill className="object-cover transition-transform duration-500 group-hover:scale-105" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" />
+          <Image
+            src={img.url}
+            alt={img.altText || product.title}
+            fill
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          />
         ) : (
           <div className="absolute inset-0 grid place-items-center bg-gray-800 text-gray-400">No image</div>
         )}
@@ -154,25 +163,14 @@ function BackgroundFX() {
 }
 
 // ---------- Category derivation ----------
-const MAX_CATEGORIES = 10;                 // keep UI tidy
-const TAG_PREFIX = 'cat:';                 // only use tags like "cat:Tees"
-
-function stripCat(tag: string) {
-  return tag.startsWith(TAG_PREFIX) ? tag.slice(TAG_PREFIX.length) : tag;
-}
+const MAX_CATEGORIES = 10;
+const TAG_PREFIX = 'cat:';
+const stripCat = (tag: string) => (tag.startsWith(TAG_PREFIX) ? tag.slice(TAG_PREFIX.length) : tag);
 
 function deriveCategories(products: ShopifyProduct[]): string[] {
-  // Prefer productType if present
-  const types = new Set(
-    products
-      .map(p => (p.productType || '').trim())
-      .filter(Boolean)
-  );
-  if (types.size > 0) {
-    return ['All', ...Array.from(types).slice(0, MAX_CATEGORIES)];
-  }
+  const types = new Set(products.map(p => (p.productType || '').trim()).filter(Boolean));
+  if (types.size > 0) return ['All', ...Array.from(types).slice(0, MAX_CATEGORIES)];
 
-  // Fallback: only tags that start with "cat:"
   const counts = new Map<string, number>();
   for (const p of products) {
     for (const t of (p.tags || [])) {
@@ -182,11 +180,7 @@ function deriveCategories(products: ShopifyProduct[]): string[] {
       counts.set(name, (counts.get(name) || 0) + 1);
     }
   }
-  const sorted = Array.from(counts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .map(([name]) => name)
-    .slice(0, MAX_CATEGORIES);
-
+  const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).map(([name]) => name).slice(0, MAX_CATEGORIES);
   return ['All', ...sorted];
 }
 
@@ -248,10 +242,9 @@ export default function HomeClient() {
   const filtered = useMemo(() => {
     if (!products) return [];
     if (category === 'All') return products;
-    // Match against productType first, else cat: tags
     return products.filter(p =>
       (p.productType && p.productType === category) ||
-      (p.tags || []).some(t => t.toLowerCase() === `${TAG_PREFIX}${category}`.toLowerCase())
+      (p.tags || []).some(t => t.toLowerCase() === `cat:${category.toLowerCase()}`)
     );
   }, [products, category]);
 
@@ -270,10 +263,19 @@ export default function HomeClient() {
         <CategoryTabs categories={categories} active={category} onChange={setCategory} />
 
         <AnimatePresence initial={false} mode="popLayout">
-          <motion.section key={category} variants={containerVariants} initial="hidden" animate="show" exit={{ opacity: 0 }} className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <motion.section
+            key={category}
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            exit={{ opacity: 0 }}
+            className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] justify-items-center gap-6"
+          >
             {loading && Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={`s-${i}`} />)}
             {!loading && !err && filtered.length === 0 && (
-              <div className="col-span-full rounded-xl border border-gray-800 p-10 text-center text-gray-300">Nothing here yet — try another category.</div>
+              <div className="col-span-full rounded-xl border border-gray-800 p-10 text-center text-gray-300">
+                Nothing here yet — try another category.
+              </div>
             )}
             {!loading && filtered.map((p) => <ProductCard key={p.id} product={p} />)}
           </motion.section>
