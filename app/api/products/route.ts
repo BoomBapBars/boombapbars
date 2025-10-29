@@ -9,7 +9,7 @@ function getEnv(name: string) {
 const DOMAIN = getEnv("SHOPIFY_STORE_DOMAIN");
 const TOKEN  = getEnv("SHOPIFY_STOREFRONT_TOKEN");
 
-// Compatible with current Storefront API (no priceRangeV2)
+// Compatible query (no priceRangeV2) + productType
 const QUERY = /* GraphQL */ `
   query ProductsForHome {
     products(first: 30, sortKey: UPDATED_AT, reverse: true) {
@@ -19,9 +19,10 @@ const QUERY = /* GraphQL */ `
           handle
           title
           description
+          productType
           tags
           images(first: 1) { edges { node { url altText } } }
-          priceRange {                       # MoneyV2
+          priceRange {
             minVariantPrice { amount currencyCode }
           }
           variants(first: 1) {
@@ -29,7 +30,7 @@ const QUERY = /* GraphQL */ `
               node {
                 id
                 availableForSale
-                price { amount currencyCode } # MoneyV2
+                price { amount currencyCode }
               }
             }
           }
@@ -84,6 +85,7 @@ export async function GET(req: Request) {
         handle: n.handle,
         title: n.title,
         description: n.description,
+        productType: n.productType ?? "",
         tags: n.tags ?? [],
         image: img ? { url: img.url, altText: img.altText ?? null } : null,
         priceRange: { minVariantPrice },

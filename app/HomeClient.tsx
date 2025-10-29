@@ -10,7 +10,15 @@ import { motion, AnimatePresence, type Variants } from 'framer-motion';
 // ---------- Types ----------
 type ShopifyImage = { url: string; altText?: string | null; width?: number | null; height?: number | null; };
 type ShopifyVariant = { id: string; title?: string; price?: string | number; availableForSale?: boolean; };
-type ShopifyProduct = { id: string; title: string; handle: string; tags?: string[]; images?: ShopifyImage[]; variants?: ShopifyVariant[]; };
+type ShopifyProduct = {
+  id: string;
+  title: string;
+  handle: string;
+  productType?: string;
+  tags?: string[];
+  images?: ShopifyImage[];
+  variants?: ShopifyVariant[];
+};
 
 // ---------- Helpers ----------
 async function createCheckout(variantId: string, quantity = 1) {
@@ -82,7 +90,7 @@ function ProductCard({ product }: { product: ShopifyProduct }) {
           <div className="shine-sweep" />
         </div>
         <div className="absolute inset-x-3 bottom-3 flex gap-2 translate-y-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-          <Link href={`/products/${product.handle}`} className="flex-1 rounded-xl px-3 py-2 text-center text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20">View</Link>
+          <Link href={`/products/${product.handle}`} className="flex-1 rounded-xl px-3 py-2 text-center text-sm font-medium text-white bg-white/10 hover:bg-white/20">View</Link>
           <button onClick={onBuyNow} disabled={!available || busy} className="flex-1 rounded-xl px-3 py-2 text-center text-sm font-semibold text-green-900 bg-green-500 hover:bg-green-400 disabled:opacity-50" aria-disabled={!available || busy}>
             {busy ? 'Loading…' : available ? 'Buy Now' : 'Sold Out'}
           </button>
@@ -123,7 +131,7 @@ function CategoryTabs({ categories, active, onChange }: { categories: string[]; 
   );
 }
 
-// ---------- Micro-Parallax Background ----------
+// ---------- Background FX ----------
 function BackgroundFX() {
   const [y, setY] = useState(0);
   const rafRef = useRef<number | null>(null);
@@ -145,6 +153,43 @@ function BackgroundFX() {
   );
 }
 
+// ---------- Category derivation ----------
+const MAX_CATEGORIES = 10;                 // keep UI tidy
+const TAG_PREFIX = 'cat:';                 // only use tags like "cat:Tees"
+
+function stripCat(tag: string) {
+  return tag.startsWith(TAG_PREFIX) ? tag.slice(TAG_PREFIX.length) : tag;
+}
+
+function deriveCategories(products: ShopifyProduct[]): string[] {
+  // Prefer productType if present
+  const types = new Set(
+    products
+      .map(p => (p.productType || '').trim())
+      .filter(Boolean)
+  );
+  if (types.size > 0) {
+    return ['All', ...Array.from(types).slice(0, MAX_CATEGORIES)];
+  }
+
+  // Fallback: only tags that start with "cat:"
+  const counts = new Map<string, number>();
+  for (const p of products) {
+    for (const t of (p.tags || [])) {
+      if (!t.startsWith(TAG_PREFIX)) continue;
+      const name = stripCat(t).trim();
+      if (!name) continue;
+      counts.set(name, (counts.get(name) || 0) + 1);
+    }
+  }
+  const sorted = Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([name]) => name)
+    .slice(0, MAX_CATEGORIES);
+
+  return ['All', ...sorted];
+}
+
 // ---------- Client Page ----------
 export default function HomeClient() {
   const router = useRouter();
@@ -154,8 +199,8 @@ export default function HomeClient() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  const initialTag = (search.get('tag') || 'All').trim();
-  const [category, setCategory] = useState<string>(initialTag || 'All');
+  const initial = (search.get('tag') || 'All').trim();
+  const [category, setCategory] = useState<string>(initial || 'All');
 
   useEffect(() => {
     const params = new URLSearchParams(Array.from(search.entries()));
@@ -178,8 +223,13 @@ export default function HomeClient() {
           Array.isArray((data as any)?.data?.products) ? (data as any).data.products :
           [];
         const normalized: ShopifyProduct[] = items.map((p) => ({
-          id: p.id, title: p.title, handle: p.handle,
-          tags: p.tags ?? [], images: p.images ?? (p.image ? [p.image] : []), variants: p.variants ?? [],
+          id: p.id,
+          title: p.title,
+          handle: p.handle,
+          productType: p.productType ?? '',
+          tags: p.tags ?? [],
+          images: p.images ?? (p.image ? [p.image] : []),
+          variants: p.variants ?? [],
         }));
         if (!alive) return;
         setProducts(normalized);
@@ -193,16 +243,16 @@ export default function HomeClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const categories = useMemo(() => {
-    const set = new Set<string>(); set.add('All');
-    (products || []).forEach((p) => (p.tags || []).forEach((t) => set.add(t)));
-    return Array.from(set);
-  }, [products]);
+  const categories = useMemo(() => deriveCategories(products || []), [products]);
 
   const filtered = useMemo(() => {
     if (!products) return [];
     if (category === 'All') return products;
-    return products.filter((p) => (p.tags || []).includes(category));
+    // Match against productType first, else cat: tags
+    return products.filter(p =>
+      (p.productType && p.productType === category) ||
+      (p.tags || []).some(t => t.toLowerCase() === `${TAG_PREFIX}${category}`.toLowerCase())
+    );
   }, [products, category]);
 
   return (
@@ -223,7 +273,7 @@ export default function HomeClient() {
           <motion.section key={category} variants={containerVariants} initial="hidden" animate="show" exit={{ opacity: 0 }} className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {loading && Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={`s-${i}`} />)}
             {!loading && !err && filtered.length === 0 && (
-              <div className="col-span-full rounded-xl border border-gray-800 p-10 text-center text-gray-300">Nothing here yet — try another tag.</div>
+              <div className="col-span-full rounded-xl border border-gray-800 p-10 text-center text-gray-300">Nothing here yet — try another category.</div>
             )}
             {!loading && filtered.map((p) => <ProductCard key={p.id} product={p} />)}
           </motion.section>
