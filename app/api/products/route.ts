@@ -1,40 +1,41 @@
 // app/api/products/route.ts
 import { NextResponse } from "next/server";
 
-export const runtime = "edge";
+export const revalidate = 0; // keep fresh during setup
 
-const SHOPIFY_STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN;
-const SHOPIFY_STOREFRONT_TOKEN = process.env.SHOPIFY_STOREFRONT_TOKEN;
+function getEnv(name: string) {
+  return (
+    process.env[name] ??
+    process.env[`NEXT_PUBLIC_${name}`] ?? // allow public names as fallback
+    null
+  );
+}
 
-const QUERY = `
-  query ProductsQuery($first: Int!) {
-    products(first: $first) {
+const DOMAIN = getEnv("SHOPIFY_STORE_DOMAIN");
+const TOKEN = getEnv("SHOPIFY_STOREFRONT_TOKEN");
+
+// Minimal product listing query
+const QUERY = /* GraphQL */ `
+  query ProductsForHome {
+    products(first: 24, sortKey: UPDATED_AT, reverse: true) {
       edges {
         node {
           id
-          title
           handle
+          title
+          description
           tags
+          priceRangeV2 {
+            minVariantPrice {
+              amount
+              currencyCode
+            }
+          }
           images(first: 1) {
             edges {
               node {
                 url
                 altText
-                width
-                height
-              }
-            }
-          }
-          variants(first: 1) {
-            edges {
-              node {
-                id
-                title
-                availableForSale
-                price: priceV2 {
-                  amount
-                  currencyCode
-                }
               }
             }
           }
@@ -45,75 +46,64 @@ const QUERY = `
 `;
 
 export async function GET() {
+  if (!DOMAIN || !TOKEN) {
+    return NextResponse.json(
+      {
+        error:
+          "Missing Shopify env vars. Set SHOPIFY_STORE_DOMAIN and SHOPIFY_STOREFRONT_TOKEN (or their NEXT_PUBLIC_* equivalents).",
+      },
+      { status: 500 }
+    );
+  }
+
+  const endpoint = `https://${DOMAIN}/api/2024-07/graphql.json`;
+
   try {
-    if (!SHOPIFY_STORE_DOMAIN || !SHOPIFY_STOREFRONT_TOKEN) {
-      return NextResponse.json(
-        {
-          error: "Missing Shopify env vars",
-          details: [
-            "SHOPIFY_STORE_DOMAIN",
-            "SHOPIFY_STOREFRONT_TOKEN",
-          ],
-        },
-        { status: 500 }
-      );
-    }
-
-    const endpoint = `https://${SHOPIFY_STORE_DOMAIN}/api/2024-07/graphql.json`;
-
     const res = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Shopify-Storefront-Access-Token": SHOPIFY_STOREFRONT_TOKEN,
+        "X-Shopify-Storefront-Access-Token": TOKEN,
       },
-      body: JSON.stringify({
-        query: QUERY,
-        variables: { first: 50 },
-      }),
+      body: JSON.stringify({ query: QUERY }),
+      // Avoid caching during setup
       cache: "no-store",
     });
 
     if (!res.ok) {
-      const text = await res.text().catch(() => "");
+      const text = await res.text();
       return NextResponse.json(
-        { error: `Shopify ${res.status}`, details: text },
+        { error: `Shopify API ${res.status}: ${text.slice(0, 500)}` },
         { status: 502 }
       );
     }
 
     const json = await res.json();
-    const products = (json?.data?.products?.edges ?? []).map((e: any) => {
-      const n = e.node;
-      const img = n?.images?.edges?.[0]?.node;
-      const v = n?.variants?.edges?.[0]?.node;
 
+    // Normalize to a compact array
+    const edges = json?.data?.products?.edges ?? [];
+    const products = edges.map((e: any) => {
+      const n = e.node;
+      const image = n.images?.edges?.[0]?.node ?? null;
       return {
         id: n.id,
-        title: n.title,
         handle: n.handle,
+        title: n.title,
+        description: n.description,
         tags: n.tags ?? [],
-        images: img ? [img] : [],
-        variants: v
-          ? [
-              {
-                id: v.id,
-                title: v.title,
-                availableForSale: v.availableForSale,
-                price: v.price?.amount,
-              },
-            ]
-          : [],
+        priceRange: {
+          minVariantPrice: n.priceRangeV2?.minVariantPrice ?? null,
+        },
+        image: image
+          ? { url: image.url, altText: image.altText ?? null }
+          : null,
       };
     });
 
     return NextResponse.json({ products });
   } catch (err: any) {
     return NextResponse.json(
-      {
-        error: "Unhandled /api/products failure",
-        details: err?.message ?? String(err),
-      },
+      { error: `Request failed: ${err?.message ?? "unknown error"}` },
       { status: 500 }
     );
   }
