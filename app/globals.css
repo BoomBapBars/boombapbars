@@ -17,9 +17,9 @@
     --bbb-900: #171C28;
     --bbb-950: #0C111A;
 
-    --bbb-accent:    #7CFF8B; /* neon mint */
-    --bbb-accent-2:  #6DA7FF; /* electric blue */
-    --bbb-accent-3:  #B16DFF; /* violet */
+    --bbb-accent:   #7CFF8B; /* neon mint */
+    --bbb-accent-2: #6DA7FF; /* electric blue */
+    --bbb-accent-3: #B16DFF; /* violet */
   }
 
   html, body {
@@ -34,65 +34,79 @@
   .font-display { font-family: var(--font-bebas), var(--font-inter), ui-sans-serif; letter-spacing: .02em; }
 }
 
-/* ---------- Utilities ---------- */
-@layer utilities {
-  .text-bbb-50  { color: var(--bbb-50); }
-  .bg-bbb-950   { background-color: var(--bbb-950); }
-  .border-bbb-800{ border-color: var(--bbb-800); }
+/* ---------- Utility helpers (no @apply) ---------- */
+.text-bbb-50  { color: var(--bbb-50); }
+.bg-bbb-950   { background-color: var(--bbb-950); }
+.border-bbb-800 { border-color: var(--bbb-800); }
 
-  .bbb-bg {
-    background:
-      radial-gradient(900px 400px at 20% -10%, rgba(125,255,139,.10), transparent 60%),
-      radial-gradient(900px 400px at 80% 0%, rgba(109,167,255,.10), transparent 60%),
-      radial-gradient(900px 400px at 50% 110%, rgba(177,109,255,.10), transparent 60%),
-      linear-gradient(180deg, #0C111A 0%, #0E131D 100%);
-  }
-
-  .nav-link {
-    @apply rounded-xl px-3 py-2 text-sm text-bbb-50/80 hover:text-bbb-50 transition-colors;
-  }
-
-  .cta {
-    @apply inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold;
-    background: linear-gradient(90deg, var(--bbb-accent), var(--bbb-accent-2));
-    color: #0a0d12;
-  }
-
-  .pill {
-    @apply rounded-full border px-3 py-1.5 text-sm;
-    border-color: rgba(255,255,255,.12);
-  }
-
-  /* subtle card sheen used by product cards */
-  .card-reflection::before {
-    content: "";
-    position: absolute; inset: 0;
-    background: radial-gradient(60% 40% at 70% 10%, rgba(255,255,255,0.12), transparent 60%);
-    pointer-events: none;
-  }
-
-  /* animated underline for active tabs */
-  .tab-underline {
-    position: absolute; left: 0; right: 0; bottom: -6px; height: 3px; border-radius: 9999px;
-    background: linear-gradient(90deg, var(--bbb-accent), var(--bbb-accent-2));
-    transform: scaleX(0); transform-origin: left;
-    transition: transform .25s ease;
-  }
-  [data-active="true"] .tab-underline { transform: scaleX(1); }
-
-  /* hero underline sweep */
-  .hero-underline {
-    position: absolute; inset: 0;
-    background: linear-gradient(90deg, var(--bbb-accent), var(--bbb-accent-2), var(--bbb-accent-3));
-    animation: sweep 2.2s linear infinite;
-  }
-  @keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
-
-  /* loading shimmer */
-  .animate-shimmer {
-    background-image: linear-gradient(90deg, rgba(255,255,255,.06), rgba(255,255,255,0), rgba(255,255,255,.06));
-    background-size: 200% 100%;
-    animation: shimmer 1.2s linear infinite;
-  }
-  @keyframes shimmer { to { background-position: -200% 0; } }
+.bbb-bg {
+  background:
+    radial-gradient(900px 400px at 20% -10%, rgba(125,255,139,.10), transparent 60%),
+    radial-gradient(900px 400px at 80% 0%, rgba(109,167,255,.10), transparent 60%),
+    radial-gradient(900px 400px at 50% 110%, rgba(177,109,255,.10), transparent 60%),
+    linear-gradient(180deg, #0C111A 0%, #0E131D 100%);
 }
+
+/* nav link look */
+.nav-link {
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: rgba(243,245,247,.8);
+  transition: color .15s ease;
+}
+.nav-link:hover { color: var(--bbb-50); }
+
+/* CTA gradient button */
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem; /* rounded-xl */
+  padding: 0.5rem 1rem;   /* px-4 py-2 */
+  font-weight: 700;       /* font-semibold */
+  font-size: 0.875rem;    /* text-sm */
+  background: linear-gradient(90deg, var(--bbb-accent), var(--bbb-accent-2));
+  color: #0a0d12;
+}
+
+/* pill chip */
+.pill {
+  border-radius: 9999px;
+  padding: 0.375rem 0.75rem; /* py-1.5 px-3 */
+  font-size: 0.875rem;
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+/* subtle card sheen used by product cards */
+.card-reflection::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: radial-gradient(60% 40% at 70% 10%, rgba(255,255,255,0.12), transparent 60%);
+  pointer-events: none;
+}
+
+/* animated underline for active tabs */
+.tab-underline {
+  position: absolute; left: 0; right: 0; bottom: -6px; height: 3px; border-radius: 9999px;
+  background: linear-gradient(90deg, var(--bbb-accent), var(--bbb-accent-2));
+  transform: scaleX(0); transform-origin: left;
+  transition: transform .25s ease;
+}
+[data-active="true"] .tab-underline { transform: scaleX(1); }
+
+/* hero underline sweep */
+.hero-underline {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, var(--bbb-accent), var(--bbb-accent-2), var(--bbb-accent-3));
+  animation: sweep 2.2s linear infinite;
+}
+@keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+/* loading shimmer */
+.animate-shimmer {
+  background-image: linear-gradient(90deg, rgba(255,255,255,.06), rgba(255,255,255,0), rgba(255,255,255,.06));
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
