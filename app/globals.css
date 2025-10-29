@@ -1,107 +1,98 @@
-/* Tailwind v4 style import (works with @tailwindcss/postcss) */
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* ---------- Base Theme (plain CSS; no @apply) ---------- */
-:root {
-  --bbb-accent-1: 99 102 241;  /* indigo-500 */
-  --bbb-accent-2: 34 197 94;   /* green-500 */
-  --bbb-accent-3: 59 130 246;  /* blue-500 */
-  color-scheme: dark;
+/* ---------- Brand palette (neutral with neon accents) ---------- */
+@layer base {
+  :root {
+    --bbb-50:  #F3F5F7;
+    --bbb-100: #E8EAEE;
+    --bbb-200: #C9CDD6;
+    --bbb-300: #A8AEBF;
+    --bbb-400: #7E879C;
+    --bbb-500: #5C657A;
+    --bbb-600: #454D60;
+    --bbb-700: #313847;
+    --bbb-800: #222734;
+    --bbb-900: #171C28;
+    --bbb-950: #0C111A;
+
+    --bbb-accent:    #7CFF8B; /* neon mint */
+    --bbb-accent-2:  #6DA7FF; /* electric blue */
+    --bbb-accent-3:  #B16DFF; /* violet */
+  }
+
+  html, body {
+    min-height: 100%;
+    overflow-y: auto;
+    background-color: var(--bbb-950);
+    color: var(--bbb-50);
+  }
+
+  /* Font stacks */
+  body { font-family: var(--font-inter), ui-sans-serif, system-ui; }
+  .font-display { font-family: var(--font-bebas), var(--font-inter), ui-sans-serif; letter-spacing: .02em; }
 }
 
-html, body {
-  /* Fallback dark theme so page isn’t white even if Tailwind hiccups */
-  background-color: #111827; /* gray-900 */
-  color: #e5e7eb;            /* gray-200 */
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+/* ---------- Utilities ---------- */
+@layer utilities {
+  .text-bbb-50  { color: var(--bbb-50); }
+  .bg-bbb-950   { background-color: var(--bbb-950); }
+  .border-bbb-800{ border-color: var(--bbb-800); }
 
-/* Utility sugar (v4 supports arbitrary props) */
-.text-balance { text-wrap: balance; }
+  .bbb-bg {
+    background:
+      radial-gradient(900px 400px at 20% -10%, rgba(125,255,139,.10), transparent 60%),
+      radial-gradient(900px 400px at 80% 0%, rgba(109,167,255,.10), transparent 60%),
+      radial-gradient(900px 400px at 50% 110%, rgba(177,109,255,.10), transparent 60%),
+      linear-gradient(180deg, #0C111A 0%, #0E131D 100%);
+  }
 
-/* ---------- Background: conic gradient (masked) ---------- */
-.bg-conic {
-  background:
-    conic-gradient(
-      from 220deg at 50% 50%,
-      rgba(var(--bbb-accent-1) / 0.06) 0deg,
-      rgba(var(--bbb-accent-2) / 0.05) 90deg,
-      transparent 160deg,
-      rgba(var(--bbb-accent-3) / 0.06) 220deg,
-      transparent 300deg
-    );
-  -webkit-mask-image: radial-gradient(70% 60% at 50% 35%, black 18%, transparent 68%);
-  mask-image: radial-gradient(70% 60% at 50% 35%, black 18%, transparent 68%);
-}
+  .nav-link {
+    @apply rounded-xl px-3 py-2 text-sm text-bbb-50/80 hover:text-bbb-50 transition-colors;
+  }
 
-/* ---------- Hover Shine Sweep ---------- */
-.shine-sweep {
-  position: absolute;
-  inset: -20%;
-  transform: translateX(-120%) rotate(12deg);
-  background: linear-gradient(
-    90deg,
-    rgba(255,255,255,0) 0%,
-    rgba(255,255,255,0.08) 45%,
-    rgba(255,255,255,0.18) 50%,
-    rgba(255,255,255,0.08) 55%,
-    rgba(255,255,255,0) 100%
-  );
-  animation: sweep 1.2s ease forwards;
-  pointer-events: none;
-}
-@keyframes sweep { to { transform: translateX(120%) rotate(12deg); } }
+  .cta {
+    @apply inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold;
+    background: linear-gradient(90deg, var(--bbb-accent), var(--bbb-accent-2));
+    color: #0a0d12;
+  }
 
-/* ---------- Subtle Card Reflection ---------- */
-.card-reflection {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    to bottom,
-    rgba(255,255,255,0.16),
-    rgba(255,255,255,0.04) 28%,
-    rgba(0,0,0,0) 55%
-  );
-  mix-blend-mode: soft-light;
-  opacity: 0.45;
-}
+  .pill {
+    @apply rounded-full border px-3 py-1.5 text-sm;
+    border-color: rgba(255,255,255,.12);
+  }
 
-/* ---------- Shimmer (Skeleton) ---------- */
-@keyframes shimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-.animate-shimmer {
-  background-image: linear-gradient(
-    90deg,
-    rgba(255,255,255,0.05) 0%,
-    rgba(255,255,255,0.10) 20%,
-    rgba(255,255,255,0.05) 40%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.2s infinite linear;
-}
+  /* subtle card sheen used by product cards */
+  .card-reflection::before {
+    content: "";
+    position: absolute; inset: 0;
+    background: radial-gradient(60% 40% at 70% 10%, rgba(255,255,255,0.12), transparent 60%);
+    pointer-events: none;
+  }
 
-/* ---------- Category Tabs Underline ---------- */
-button .tab-underline {
-  position: absolute;
-  left: 18%; right: 18%; bottom: 2px;
-  height: 2px; border-radius: 2px;
-  background: linear-gradient(90deg, #22c55e, #60a5fa);
-  transform-origin: center; transform: scaleX(0);
-  transition: transform 200ms ease; opacity: 0.9;
-}
-button[data-active="true"] .tab-underline { transform: scaleX(1); }
+  /* animated underline for active tabs */
+  .tab-underline {
+    position: absolute; left: 0; right: 0; bottom: -6px; height: 3px; border-radius: 9999px;
+    background: linear-gradient(90deg, var(--bbb-accent), var(--bbb-accent-2));
+    transform: scaleX(0); transform-origin: left;
+    transition: transform .25s ease;
+  }
+  [data-active="true"] .tab-underline { transform: scaleX(1); }
 
-/* ---------- Hero underline animation ---------- */
-.hero-underline {
-  position: absolute; inset: 0;
-  background: linear-gradient(90deg, rgba(34,197,94,0), rgba(34,197,94,1), rgba(59,130,246,1), rgba(59,130,246,0));
-  transform-origin: left center;
-  animation: underline-fill 1.2s ease forwards 0.15s;
-}
-@keyframes underline-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  /* hero underline sweep */
+  .hero-underline {
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, var(--bbb-accent), var(--bbb-accent-2), var(--bbb-accent-3));
+    animation: sweep 2.2s linear infinite;
+  }
+  @keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 
-/* ---------- Perf polish ---------- */
-* { backface-visibility: hidden; }
+  /* loading shimmer */
+  .animate-shimmer {
+    background-image: linear-gradient(90deg, rgba(255,255,255,.06), rgba(255,255,255,0), rgba(255,255,255,.06));
+    background-size: 200% 100%;
+    animation: shimmer 1.2s linear infinite;
+  }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+}
